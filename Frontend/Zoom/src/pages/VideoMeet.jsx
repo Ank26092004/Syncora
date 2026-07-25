@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useContext } from 'react'
 import io from "socket.io-client";
 import { Badge, IconButton, TextField } from '@mui/material';
 import { Button } from '@mui/material';
@@ -12,6 +12,7 @@ import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import StopScreenShareIcon from '@mui/icons-material/StopScreenShare'
 import ChatIcon from '@mui/icons-material/Chat'
 import server from '../environment';
+import { AuthContext } from '../contexts/AuthContext';
 
 const server_url = server;
 
@@ -34,9 +35,9 @@ export default function VideoMeetComponent() {
 
     let [audioAvailable, setAudioAvailable] = useState(true);
 
-    let [video, setVideo] = useState([]);
+    let [video, setVideo] = useState(true);
 
-    let [audio, setAudio] = useState();
+    let [audio, setAudio] = useState(true);
 
     let [screen, setScreen] = useState();
 
@@ -65,10 +66,70 @@ export default function VideoMeetComponent() {
     // }
 
     useEffect(() => {
-        console.log("HELLO")
         getPermissions();
+    }, []);
 
-    })
+    useEffect(() => {
+        if (!askForUsername && localVideoref.current && window.localStream) {
+            localVideoref.current.srcObject = window.localStream;
+        }
+    }, [askForUsername]);
+
+    const getPermissions = async () => {
+        try {
+            const userMediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            if (userMediaStream) {
+                setVideoAvailable(true);
+                setAudioAvailable(true);
+                window.localStream = userMediaStream;
+                if (localVideoref.current) {
+                    localVideoref.current.srcObject = userMediaStream;
+                }
+            }
+        } catch (error) {
+            console.log("Could not get combined video/audio stream, checking individually:", error);
+            let vAvail = false;
+            let aAvail = false;
+
+            try {
+                const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                if (videoStream) {
+                    vAvail = true;
+                    setVideoAvailable(true);
+                }
+            } catch (e) {
+                setVideoAvailable(false);
+            }
+
+            try {
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (audioStream) {
+                    aAvail = true;
+                    setAudioAvailable(true);
+                }
+            } catch (e) {
+                setAudioAvailable(false);
+            }
+
+            if (vAvail || aAvail) {
+                try {
+                    const userMediaStream = await navigator.mediaDevices.getUserMedia({ video: vAvail, audio: aAvail });
+                    window.localStream = userMediaStream;
+                    if (localVideoref.current) {
+                        localVideoref.current.srcObject = userMediaStream;
+                    }
+                } catch (e) {
+                    console.log(e);
+                }
+            }
+        }
+
+        if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+            setScreenAvailable(true);
+        } else {
+            setScreenAvailable(false);
+        }
+    };
 
     let getDislayMedia = () => {
         if (screen) {
@@ -81,55 +142,7 @@ export default function VideoMeetComponent() {
         }
     }
 
-    const getPermissions = async () => {
-        try {
-            const videoPermission = await navigator.mediaDevices.getUserMedia({ video: true });
-            if (videoPermission) {
-                setVideoAvailable(true);
-                console.log('Video permission granted');
-            } else {
-                setVideoAvailable(false);
-                console.log('Video permission denied');
-            }
-
-            const audioPermission = await navigator.mediaDevices.getUserMedia({ audio: true });
-            if (audioPermission) {
-                setAudioAvailable(true);
-                console.log('Audio permission granted');
-            } else {
-                setAudioAvailable(false);
-                console.log('Audio permission denied');
-            }
-
-            if (navigator.mediaDevices.getDisplayMedia) {
-                setScreenAvailable(true);
-            } else {
-                setScreenAvailable(false);
-            }
-
-            if (videoAvailable || audioAvailable) {
-                const userMediaStream = await navigator.mediaDevices.getUserMedia({ video: videoAvailable, audio: audioAvailable });
-                if (userMediaStream) {
-                    window.localStream = userMediaStream;
-                    if (localVideoref.current) {
-                        localVideoref.current.srcObject = userMediaStream;
-                    }
-                }
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    };
-
-    useEffect(() => {
-        if (video !== undefined && audio !== undefined) {
-            getUserMedia();
-            console.log("SET STATE HAS ", video, audio);
-
-        }
-
-
-    }, [video, audio])
+    // Stream track enabled toggling is handled directly in handleVideo and handleAudio
     let getMedia = () => {
         setVideo(videoAvailable);
         setAudio(audioAvailable);
@@ -383,12 +396,27 @@ export default function VideoMeetComponent() {
     }
 
     let handleVideo = () => {
-        setVideo(!video);
-        // getUserMedia();
+        setVideo((prevVideo) => {
+            const nextState = !prevVideo;
+            if (window.localStream) {
+                window.localStream.getVideoTracks().forEach((track) => {
+                    track.enabled = nextState;
+                });
+            }
+            return nextState;
+        });
     }
+
     let handleAudio = () => {
-        setAudio(!audio)
-        // getUserMedia();
+        setAudio((prevAudio) => {
+            const nextState = !prevAudio;
+            if (window.localStream) {
+                window.localStream.getAudioTracks().forEach((track) => {
+                    track.enabled = nextState;
+                });
+            }
+            return nextState;
+        });
     }
 
     useEffect(() => {
@@ -431,18 +459,24 @@ export default function VideoMeetComponent() {
 
 
 
+    const { addToHistory } = useContext(AuthContext);
+
     let sendMessage = () => {
         console.log(socketRef.current);
         socketRef.current.emit('chat-message', message, username)
         setMessage("");
-
-        // this.setState({ message: "", sender: username })
     }
 
-    
-    let connect = () => {
+    let connect = async () => {
         setAskForUsername(false);
         getMedia();
+        if (localStorage.getItem("token")) {
+            try {
+                await addToHistory(window.location.href);
+            } catch (err) {
+                console.log("Activity history error:", err);
+            }
+        }
     }
 
 

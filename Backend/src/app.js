@@ -5,6 +5,10 @@ import mongoose from "mongoose";
 import {connectToSocket} from "./controllers/socketManager.js";
 import cors from "cors";
 import userRoutes from "./routes/usersRoutes.js";
+import dotenv from "dotenv";
+
+dotenv.config();
+
 const app= express();
 const server=createServer(app);
 const io=connectToSocket(server);
@@ -20,13 +24,13 @@ app.get("/home",(req,res)=>{
 });
 const start=async()=>{
     try{
-    const connectionDB=await mongoose.connect("mongodb+srv://ankushlodhi26092004_db_user:ankush26092004@cluster0.n2pl4fw.mongodb.net/");
+    const connectionDB=await mongoose.connect(process.env.MONGO_URI);
     console.log(`MONGO Connected DB Host :${connectionDB.connection.host}`)
     }catch(e){
         console.log(e);
     }
     server.listen(app.get("port"),()=>{
-        console.log("LISTENING ON PORT 8000");
+        console.log(`LISTENING ON PORT ${app.get("port")}`);
     })
 
 }
