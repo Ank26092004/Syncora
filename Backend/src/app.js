@@ -6,6 +6,7 @@ import {connectToSocket} from "./controllers/socketManager.js";
 import cors from "cors";
 import userRoutes from "./routes/usersRoutes.js";
 import dotenv from "dotenv";
+import aiRoutes from "./routes/aiRoutes.js";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(cors());
 app.use(express.json({limit:"40kb"}));
 app.use(express.urlencoded({limit:"40kb",extended:true}));
 app.use("/api/v1/users",userRoutes);
+app.use("/api/v1/ai", aiRoutes);
 // app.use("/api/v2/users",newUserRoutes);
 
 app.get("/home",(req,res)=>{
