@@ -1,7 +1,8 @@
 import axios from "axios";
+import server from "../environment";
 
 const getMeetingSummary = async (transcript) => {
-  const response = await axios.post("http://localhost:8000/api/v1/ai/summary", {
+  const response = await axios.post(`${server}/api/v1/ai/summary`, {
     transcript,
   });
 

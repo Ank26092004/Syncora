@@ -10,4 +10,6 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.js (our SSR error wrapper).
     server: { entry: "server" },
   },
+  // Build for Vercel instead of the Cloudflare default.
+  nitro: { preset: "vercel" },
 });
